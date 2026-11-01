@@ -1,0 +1,105 @@
+rules_version = '2';
+
+// Reglas de seguridad de "Dónde está mi camión".
+//
+// Modelo:
+//   usuarios/{uid}                  perfil con rol "dueno" o "chofer" y su flotaId
+//   flotas/{flotaId}                flotaId = uid del dueño
+//   flotas/{flotaId}/camiones/{id}  camiones; ultimaUbicacion = posición en vivo
+//   .../camiones/{id}/posiciones    historial de posiciones
+//   invitaciones/{codigo}           código que el dueño pasa a sus choferes
+//
+// Un servidor que reciba datos de un GPS 4G escribe con el Admin SDK, que no
+// pasa por estas reglas.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function logueado() {
+      return request.auth != null;
+    }
+
+    function rutaUsuario(uid) {
+      return /databases/$(database)/documents/usuarios/$(uid);
+    }
+
+    function esDueno(flotaId) {
+      return logueado() && request.auth.uid == flotaId;
+    }
+
+    function esMiembro(flotaId) {
+      return esDueno(flotaId)
+        || (logueado()
+            && exists(rutaUsuario(request.auth.uid))
+            && get(rutaUsuario(request.auth.uid)).data.flotaId == flotaId);
+    }
+
+    function soloCambia(campos) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(campos);
+    }
+
+    match /usuarios/{uid} {
+      // Cada uno ve su perfil; el dueño ve los perfiles de su flota.
+      allow read: if logueado()
+        && (request.auth.uid == uid || resource.data.flotaId == request.auth.uid);
+
+      allow create: if logueado() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(
+             ['nombre', 'email', 'rol', 'flotaId', 'codigoInvitacion'])
+        && request.resource.data.nombre is string
+        && (
+          // Un dueño solo puede ser dueño de su propia flota.
+          (request.resource.data.rol == 'dueno'
+            && request.resource.data.flotaId == uid)
+          ||
+          // Un chofer necesita un código de invitación válido de esa flota.
+          (request.resource.data.rol == 'chofer'
+            && request.resource.data.flotaId != uid
+            && get(/databases/$(database)/documents/invitaciones/$(request.resource.data.codigoInvitacion))
+                 .data.flotaId == request.resource.data.flotaId)
+        );
+
+      // Nadie puede cambiarse el rol ni la flota.
+      allow update: if logueado() && request.auth.uid == uid && soloCambia(['nombre']);
+      allow delete: if false;
+    }
+
+    match /invitaciones/{codigo} {
+      // Se puede consultar un código puntual (para validar antes de
+      // registrarse), pero no listar todos.
+      allow get: if true;
+      allow list: if false;
+      allow create: if esDueno(request.resource.data.flotaId)
+        && request.resource.data.keys().hasOnly(['flotaId']);
+      allow delete: if logueado() && resource.data.flotaId == request.auth.uid;
+    }
+
+    match /flotas/{flotaId} {
+      allow read: if esMiembro(flotaId);
+      allow create: if esDueno(flotaId)
+        && request.resource.data.duenoUid == request.auth.uid;
+      allow update: if esDueno(flotaId)
+        && request.resource.data.duenoUid == resource.data.duenoUid;
+      allow delete: if false;
+
+      match /camiones/{camionId} {
+        function esChoferAsignado() {
+          return logueado()
+            && get(/databases/$(database)/documents/flotas/$(flotaId)/camiones/$(camionId))
+                 .data.choferUid == request.auth.uid;
+        }
+
+        allow read: if esMiembro(flotaId);
+        allow create, delete: if esDueno(flotaId);
+        // El chofer asignado solo puede actualizar la ubicación en vivo.
+        allow update: if esDueno(flotaId)
+          || (esChoferAsignado() && soloCambia(['ultimaUbicacion']));
+
+        match /posiciones/{posicionId} {
+          allow read: if esMiembro(flotaId);
+          allow create: if esChoferAsignado();
+          allow update, delete: if false;
+        }
+      }
+    }
+  }
+}
