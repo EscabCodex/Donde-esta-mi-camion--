@@ -1,5 +1,5 @@
 # Revisa el código y arma el APK de Android en cada cambio.
-# El APK queda para descargar en la pestaña "Actions" de GitHub.
+# El APK queda publicado en Releases como "ultima-version" para bajarlo directo.
 name: App
 
 on:
@@ -7,6 +7,9 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: write # para publicar el APK como descarga directa
 
 jobs:
   revisar-y-armar:
@@ -37,3 +40,17 @@ jobs:
           name: donde-esta-mi-camion-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
+
+      # Descarga directa (también desde el celular):
+      # https://github.com/<dueño>/<repo>/releases/download/ultima-version/donde-esta-mi-camion.apk
+      - name: Publicar APK para descargar
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk donde-esta-mi-camion.apk
+          gh release delete ultima-version --cleanup-tag --yes || true
+          gh release create ultima-version donde-esta-mi-camion.apk \
+            --target "$SHA" --prerelease \
+            --title "Última versión para probar" \
+            --notes "APK armado automáticamente desde $SHA."
