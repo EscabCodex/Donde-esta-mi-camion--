@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' show Color;
 import 'package:geolocator/geolocator.dart';
 
 import '../modelos/lectura_ubicacion.dart';
@@ -7,9 +6,8 @@ import 'proveedor_ubicacion.dart';
 
 /// Ubicación tomada del GPS del celular del chofer.
 ///
-/// En Android corre como "servicio en primer plano": mientras comparte,
-/// queda un aviso fijo en la barra de notificaciones y la ubicación se sigue
-/// mandando aunque el chofer apague la pantalla o cambie de app.
+/// En Android se usa desde [ServicioUbicacion], que la sigue leyendo aunque
+/// la app esté cerrada.
 class ProveedorCelular implements ProveedorUbicacion {
   ProveedorCelular({this.metrosEntreLecturas = 25});
 
@@ -61,19 +59,11 @@ class ProveedorCelular implements ProveedorUbicacion {
         distanceFilter: metrosEntreLecturas,
       );
     }
+    // El aviso fijo lo pone ServicioUbicacion, no geolocator.
     return AndroidSettings(
       accuracy: LocationAccuracy.high,
       distanceFilter: metrosEntreLecturas,
       intervalDuration: const Duration(seconds: 10),
-      foregroundNotificationConfig: const ForegroundNotificationConfig(
-        notificationTitle: 'Compartiendo ubicación',
-        notificationText:
-            'El dueño ve dónde está el camión. Podés apagar la pantalla.',
-        notificationChannelName: 'Ubicación del camión',
-        enableWakeLock: true,
-        setOngoing: true,
-        color: Color(0xFF1565C0),
-      ),
     );
   }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../modelos/camion.dart';
@@ -8,12 +10,13 @@ import '../../servicios/flota_servicio.dart';
 import '../../ubicacion/ajustes_celular.dart';
 import '../../ubicacion/proveedor_celular.dart';
 import '../../ubicacion/publicador_ubicacion.dart';
+import '../../ubicacion/servicio_ubicacion.dart';
 import '../../widgets/formato.dart';
 
 /// Pantalla del chofer: ve su camión y comparte la ubicación.
 ///
-/// La ubicación se sigue mandando con la pantalla apagada: en Android queda
-/// un aviso fijo "Compartiendo ubicación" mientras está activo.
+/// La ubicación se sigue mandando con la pantalla apagada y aunque se cierre
+/// la app: en Android queda un aviso fijo "Compartiendo ubicación".
 class InicioChofer extends StatelessWidget {
   const InicioChofer({super.key, required this.usuario, required this.auth});
 
@@ -88,11 +91,15 @@ class _CompartirUbicacion extends StatefulWidget {
 }
 
 class _CompartirUbicacionState extends State<_CompartirUbicacion> {
+  // Fuera de Android (web) se comparte solo con la página abierta.
   late final _publicador = PublicadorUbicacion(
     flotaId: widget.flotaId,
     camionId: widget.camion.id,
   );
   final _proveedor = ProveedorCelular();
+  StreamSubscription<String>? _errores;
+  bool _activo = false;
+  bool _ocupado = false;
   String? _error;
   bool _permisoSiempre = true;
 
@@ -101,16 +108,52 @@ class _CompartirUbicacionState extends State<_CompartirUbicacion> {
   static bool _yaPreguntoBateria = false;
 
   @override
+  void initState() {
+    super.initState();
+    if (ServicioUbicacion.disponible) {
+      _errores = ServicioUbicacion.errores().listen(
+        (m) => mounted ? setState(() => _error = m) : null,
+      );
+      // Si la app se cerró mientras compartía, el servicio sigue andando.
+      ServicioUbicacion.camionCompartido().then((camion) async {
+        final siempre = await _proveedor.tienePermisoSiempre();
+        if (mounted) {
+          setState(() {
+            _activo = camion == widget.camion.id;
+            _permisoSiempre = siempre;
+          });
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
+    _errores?.cancel();
     _publicador.detener();
     super.dispose();
   }
 
   Future<void> _alternar() async {
-    if (_publicador.activo) {
-      setState(_publicador.detener);
-      return;
+    if (_ocupado) return;
+    setState(() => _ocupado = true);
+    try {
+      if (_activo) {
+        if (ServicioUbicacion.disponible) {
+          await ServicioUbicacion.detener();
+        } else {
+          _publicador.detener();
+        }
+        if (mounted) setState(() => _activo = false);
+        return;
+      }
+      await _empezar();
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
     }
+  }
+
+  Future<void> _empezar() async {
     final problema = await _proveedor.prepararse();
     if (!mounted) return;
     if (problema != null) {
@@ -124,13 +167,21 @@ class _CompartirUbicacionState extends State<_CompartirUbicacion> {
     setState(() {
       _error = null;
       _permisoSiempre = siempre;
+    });
+    if (ServicioUbicacion.disponible) {
+      await ServicioUbicacion.iniciar(
+        flotaId: widget.flotaId,
+        camionId: widget.camion.id,
+      );
+    } else {
       _publicador.iniciar(
         _proveedor,
         alFallar: (e) {
           if (mounted) setState(() => _error = mensajeDeError(e));
         },
       );
-    });
+    }
+    if (mounted) setState(() => _activo = true);
   }
 
   /// Pide, explicando antes, lo que hace falta para que la ubicación no se
@@ -191,7 +242,7 @@ class _CompartirUbicacionState extends State<_CompartirUbicacion> {
   Widget build(BuildContext context) {
     final c = widget.camion;
     final esGps = c.fuente == FuenteUbicacion.gps;
-    final activo = _publicador.activo;
+    final activo = _activo;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -207,7 +258,7 @@ class _CompartirUbicacionState extends State<_CompartirUbicacion> {
               const Text('Este camión reporta su ubicación con un GPS 4G.')
             else
               FilledButton.icon(
-                onPressed: _alternar,
+                onPressed: _ocupado ? null : _alternar,
                 icon: Icon(activo ? Icons.stop : Icons.play_arrow),
                 label: Text(
                   activo ? 'Dejar de compartir' : 'Compartir mi ubicación',
@@ -223,7 +274,8 @@ class _CompartirUbicacionState extends State<_CompartirUbicacion> {
               const Text(
                 'Podés apagar la pantalla o usar otras apps: la ubicación se '
                 'sigue mandando mientras veas el aviso "Compartiendo '
-                'ubicación". No cierres la app deslizándola.',
+                'ubicación", aunque cierres la app. Se corta cuando tocás '
+                '"Dejar de compartir" o cerrás sesión.',
               ),
               if (!_permisoSiempre) ...[
                 const SizedBox(height: 8),
