@@ -46,3 +46,7 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Pruebas de reglas
+node_modules/
+*-debug.log
