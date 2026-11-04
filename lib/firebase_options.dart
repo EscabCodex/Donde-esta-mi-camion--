@@ -8,8 +8,8 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
-/// Pasa a true cuando se completen los valores de abajo.
-const bool firebaseConfigurado = false;
+/// Proyecto Firebase: donde-esta-mi-camion-626b5.
+const bool firebaseConfigurado = true;
 
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
@@ -25,19 +25,19 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'COMPLETAR',
-    appId: 'COMPLETAR',
-    messagingSenderId: 'COMPLETAR',
-    projectId: 'COMPLETAR',
-    authDomain: 'COMPLETAR.firebaseapp.com',
-    storageBucket: 'COMPLETAR.firebasestorage.app',
+    apiKey: 'AIzaSyC1SuID2-wvlLoAUGmZNWsVQ0-tnXXNapI',
+    appId: '1:996549075626:web:57866fe4d561d07097e6d3',
+    messagingSenderId: '996549075626',
+    projectId: 'donde-esta-mi-camion-626b5',
+    authDomain: 'donde-esta-mi-camion-626b5.firebaseapp.com',
+    storageBucket: 'donde-esta-mi-camion-626b5.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'COMPLETAR',
-    appId: 'COMPLETAR',
-    messagingSenderId: 'COMPLETAR',
-    projectId: 'COMPLETAR',
-    storageBucket: 'COMPLETAR.firebasestorage.app',
+    apiKey: 'AIzaSyDkcdLhnqN-04ron8VhsWynlfRTmZz5N9Q',
+    appId: '1:996549075626:android:f42599c1f094719397e6d3',
+    messagingSenderId: '996549075626',
+    projectId: 'donde-esta-mi-camion-626b5',
+    storageBucket: 'donde-esta-mi-camion-626b5.firebasestorage.app',
   );
 }
