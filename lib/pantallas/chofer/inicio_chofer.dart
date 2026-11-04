@@ -5,14 +5,15 @@ import '../../modelos/lectura_ubicacion.dart';
 import '../../modelos/usuario.dart';
 import '../../servicios/auth_servicio.dart';
 import '../../servicios/flota_servicio.dart';
+import '../../ubicacion/ajustes_celular.dart';
 import '../../ubicacion/proveedor_celular.dart';
 import '../../ubicacion/publicador_ubicacion.dart';
 import '../../widgets/formato.dart';
 
 /// Pantalla del chofer: ve su camión y comparte la ubicación.
 ///
-/// Versión inicial: comparte mientras la app está abierta. El paso 2 suma
-/// turnos y seguimiento con la pantalla apagada.
+/// La ubicación se sigue mandando con la pantalla apagada: en Android queda
+/// un aviso fijo "Compartiendo ubicación" mientras está activo.
 class InicioChofer extends StatelessWidget {
   const InicioChofer({super.key, required this.usuario, required this.auth});
 
@@ -93,6 +94,11 @@ class _CompartirUbicacionState extends State<_CompartirUbicacion> {
   );
   final _proveedor = ProveedorCelular();
   String? _error;
+  bool _permisoSiempre = true;
+
+  /// Solo preguntamos una vez por el ahorro de batería cada vez que se abre
+  /// la app, para no molestar.
+  static bool _yaPreguntoBateria = false;
 
   @override
   void dispose() {
@@ -111,8 +117,13 @@ class _CompartirUbicacionState extends State<_CompartirUbicacion> {
       setState(() => _error = problema);
       return;
     }
+    await _pedirAjustesSegundoPlano();
+    if (!mounted) return;
+    final siempre = await _proveedor.tienePermisoSiempre();
+    if (!mounted) return;
     setState(() {
       _error = null;
+      _permisoSiempre = siempre;
       _publicador.iniciar(
         _proveedor,
         alFallar: (e) {
@@ -120,6 +131,60 @@ class _CompartirUbicacionState extends State<_CompartirUbicacion> {
         },
       );
     });
+  }
+
+  /// Pide, explicando antes, lo que hace falta para que la ubicación no se
+  /// corte con la pantalla apagada. Si el chofer dice que no, igual se
+  /// comparte (con menos garantías).
+  Future<void> _pedirAjustesSegundoPlano() async {
+    if (!await _proveedor.tienePermisoSiempre()) {
+      if (!mounted) return;
+      final ir = await _explicar(
+        titulo: 'Ubicación con la pantalla apagada',
+        texto:
+            'Para que el dueño vea el camión aunque apagues la pantalla, '
+            'en la pantalla que se abre ahora tocá "Ubicación" (si hace '
+            'falta) y elegí "Permitir todo el tiempo". Después volvé a '
+            'esta app.',
+      );
+      if (ir) await _proveedor.pedirPermisoSiempre();
+    }
+    await AjustesCelular.pedirNotificaciones();
+    if (!_yaPreguntoBateria && !await AjustesCelular.sinAhorroDeBateria()) {
+      _yaPreguntoBateria = true;
+      if (!mounted) return;
+      final ir = await _explicar(
+        titulo: 'Que no se corte',
+        texto:
+            'Algunos celulares frenan las apps para ahorrar batería y la '
+            'ubicación deja de llegar. En el próximo mensaje tocá "Permitir".',
+      );
+      if (ir) await AjustesCelular.pedirSinAhorroDeBateria();
+    }
+  }
+
+  Future<bool> _explicar({
+    required String titulo,
+    required String texto,
+  }) async {
+    final r = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(titulo),
+        content: Text(texto),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Ahora no'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Seguir'),
+          ),
+        ],
+      ),
+    );
+    return r ?? false;
   }
 
   @override
@@ -153,6 +218,23 @@ class _CompartirUbicacionState extends State<_CompartirUbicacion> {
                       )
                     : null,
               ),
+            if (activo) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Podés apagar la pantalla o usar otras apps: la ubicación se '
+                'sigue mandando mientras veas el aviso "Compartiendo '
+                'ubicación". No cierres la app deslizándola.',
+              ),
+              if (!_permisoSiempre) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Ojo: no está elegido "Permitir todo el tiempo". Si la '
+                  'ubicación se corta, tocá "Dejar de compartir" y volvé a '
+                  'empezar para elegirlo.',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+            ],
             if (_error != null) ...[
               const SizedBox(height: 8),
               Text(

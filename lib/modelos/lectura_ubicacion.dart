@@ -1,6 +1,6 @@
 /// De dónde viene la ubicación de un camión.
 enum FuenteUbicacion {
-  /// El celular del chofer, con la app abierta.
+  /// El celular del chofer (también con la pantalla apagada).
   celular,
 
   /// Un rastreador GPS 4G instalado en el camión, que reporta a un servidor.

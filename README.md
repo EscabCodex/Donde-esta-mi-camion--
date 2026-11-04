@@ -14,7 +14,7 @@ Hecha con [Flutter](https://flutter.dev) (Android + web) y
 | Paso | Qué incluye | Estado |
 | --- | --- | --- |
 | 1 | Proyecto Flutter, login, roles dueño/chofer, reglas de seguridad | ✅ |
-| 2 | Modo chofer: turnos y ubicación con la pantalla apagada | pendiente |
+| 2 | Modo chofer: ubicación con la pantalla apagada (turnos después) | en prueba |
 | 3 | Modo dueño: mapa en vivo y avisos (ubicación apagada, fin de turno) | pendiente |
 | 4 | Prueba con los choferes | pendiente |
 
