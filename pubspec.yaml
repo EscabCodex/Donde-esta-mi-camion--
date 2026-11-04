@@ -38,6 +38,10 @@ dependencies:
   firebase_auth: ^7.0.1
   cloud_firestore: ^7.1.0
   geolocator: ^14.1.2
+  # 12.x: la 13 exige compilar contra Android SDK 37, que Flutter todavía no usa.
+  permission_handler: ^12.0.1
+  flutter_background_service: ^5.1.0
+  shared_preferences: ^2.5.6
 
 dev_dependencies:
   flutter_test:

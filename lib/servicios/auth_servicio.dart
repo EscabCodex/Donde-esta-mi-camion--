@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../modelos/usuario.dart';
+import '../ubicacion/servicio_ubicacion.dart';
 import 'codigo_invitacion.dart';
 
 /// Inicio de sesión, registro y perfil (con su rol) de cada persona.
@@ -24,7 +25,11 @@ class AuthServicio {
   Future<void> iniciarSesion(String email, String clave) =>
       _auth.signInWithEmailAndPassword(email: email.trim(), password: clave);
 
-  Future<void> cerrarSesion() => _auth.signOut();
+  /// Al cerrar sesión también se deja de compartir la ubicación.
+  Future<void> cerrarSesion() async {
+    await ServicioUbicacion.detener();
+    await _auth.signOut();
+  }
 
   /// Crea la cuenta del dueño junto con su flota y su código de invitación.
   Future<void> registrarDueno({

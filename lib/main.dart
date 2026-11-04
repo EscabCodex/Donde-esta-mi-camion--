@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'firebase_options.dart';
 import 'pantallas/compuerta.dart';
 import 'pantallas/falta_firebase.dart';
+import 'ubicacion/servicio_ubicacion.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,6 +12,7 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    await ServicioUbicacion.configurar();
   }
   runApp(const AppCamion(firebaseListo: firebaseConfigurado));
 }
